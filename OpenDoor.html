@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Three.js实现简单开门动画</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+<script type="module">
+    import * as THREE from 'https://threejs.org/build/three.module.js';
+    import Stats from 'https://threejs.org/examples/jsm/libs/stats.module.js';
+    import {OrbitControls} from 'https://threejs.org/examples/jsm/controls/OrbitControls.js';
+    import {Water} from 'https://threejs.org/examples/jsm/objects/Water2.js';
+
+    const stats = new Stats(); // 性能监控器，用来查看Three.js渲染帧率
+
+    // 创建div
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    window.addEventListener('click', onMouseClick);
+
+    function onMouseClick(event) {
+        var x, y;
+        if (event.changedTouches) {
+            x = event.changedTouches[0].pageX;
+            y = event.changedTouches[0].pageY;
+        } else {
+            x = event.clientX;
+            y = event.clientY;
+        }
+        // 声明 raycaster 和 mouse 变量
+        var raycaster = new THREE.Raycaster();
+        var mouse = new THREE.Vector2();
+
+        mouse.x = (x / window.innerWidth) * 2 - 1;
+        mouse.y = -(y / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        var intersects = raycaster.intersectObjects([scene], true);
+
+        // 获取选中最近的 Mesh 对象
+        if (intersects.length != 0 && intersects[0].object instanceof THREE.Mesh) {
+            var selectObject = intersects[0].object;
+            // alert(selectObject.name);
+            console.log(selectObject.name);
+        }
+    }
+
+
+    // 创建场景
+    const scene = new THREE.Scene();
+    const cubeTextureLoader = new THREE.CubeTextureLoader();
+    cubeTextureLoader.setPath('images/');
+
+    const cubeTexture = cubeTextureLoader.load([
+        "posx.jpg", "negx.jpg",
+        "posy.jpg", "negy.jpg",
+        "posz.jpg", "negz.jpg"
+    ]);
+
+
+    scene.background = cubeTexture;
+    // 创建时钟
+    const clock = new THREE.Clock();
+
+    // // 创建相机
+    const camera = new THREE.PerspectiveCamera( // 透视投影相机
+        40, // 视场，表示能够看到的角度范围
+        window.innerWidth / window.innerHeight, // 渲染窗口的长宽比，设置为浏览器窗口的长宽比
+        0.1, // 从距离相机多远的位置开始渲染
+        2000 // 距离相机多远的位置截止渲染
+    );
+    camera.position.set(20, 100, 600); // 设置相机位置
+    camera.lookAt(scene.position);
+
+
+    // 创建渲染器
+    const renderer = new THREE.WebGLRenderer({ antialias: true, // 是否执行抗锯齿
+    });
+    renderer.setPixelRatio(window.devicePixelRatio); // 设置设备像素比率。通常用于HiDPI设备，以防止输出画布模糊。
+    renderer.setSize(window.innerWidth, window.innerHeight); // 设置渲染器大小
+    container.appendChild(renderer.domElement);
+
+    // 创建控制器
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.minDistance = 5;
+    controls.maxDistance = 600;
+
+    // 创建平面
+    const groundGeometry = new THREE.PlaneBufferGeometry(300, 300);
+    const groundMaterial = new THREE.MeshStandardMaterial({roughness: 0.8, metalness: 0.4});
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = Math.PI * -0.5;
+    scene.add(ground);
+
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.load('images/hardwood2_diffuse.jpg', function (map) {
+
+        map.wrapS = THREE.RepeatWrapping;
+        map.wrapT = THREE.RepeatWrapping;
+        map.anisotropy = 16;
+        map.repeat.set(4, 4);
+        groundMaterial.map = map;
+        groundMaterial.needsUpdate = true;
+
+    });
+
+    //查看官网实例 可以作为水面
+    const waterGeometry = new THREE.PlaneBufferGeometry( 100, 100 );
+   const water = new Water( waterGeometry, {
+        color: '#ffffff',
+        scale: 10,
+        flowDirection: new THREE.Vector2( 1, 1),
+        textureWidth: 1024,
+        textureHeight: 1024
+    } );
+    water.position.set(0,50,0);
+     water.rotation.x = Math.PI * - 0.5;
+    scene.add( water );
+
+
+
+    //光线
+    const ambientLight = new THREE.AmbientLight(0xcccccc, 0.4);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    directionalLight.position.set(-1, 1, 1);
+    scene.add(directionalLight);
+
+
+    // 创建门框
+    const doorFrameSide = new THREE.BoxBufferGeometry(1, 20, 2); // 侧边门框
+    const doorFrameTop = new THREE.BoxBufferGeometry(12, 1, 2); // 上门框
+
+    const doorFrameMaterial = new THREE.MeshLambertMaterial({color: 0xad4800,});
+    const doorFrameLeftMesh = new THREE.Mesh(doorFrameSide, doorFrameMaterial);
+
+    doorFrameLeftMesh.name = '左门框';
+    const doorFrameTopMesh = new THREE.Mesh(doorFrameTop, doorFrameMaterial);
+    const doorFrameRightMesh = doorFrameLeftMesh.clone();
+    doorFrameRightMesh.name = '右门框';
+    doorFrameTopMesh.name = '上门框';
+    doorFrameLeftMesh.position.set(-5.5, 10, 0);
+    doorFrameRightMesh.position.set(5.5, 10, 0);
+    doorFrameTopMesh.position.set(0, 20.5, 0);
+    scene.add(doorFrameLeftMesh);
+    scene.add(doorFrameRightMesh);
+    scene.add(doorFrameTopMesh);
+
+    // 创建门 旋转方式1
+    const door = new THREE.BoxBufferGeometry(10, 20, 0.5);
+    door.translate(-5, 0, 0);//右边门框做轴
+    // door.translate(5,0,0);//左边门框做轴
+    const doorMaterial = new THREE.MeshLambertMaterial({color: 0xd88c00});
+    const doorMesh = new THREE.Mesh(door, doorMaterial);
+    doorMesh.name = '门';
+    // doorMesh.position.set(-5, 10, 0);
+    doorMesh.position.set(5, 10, 0);
+    scene.add(doorMesh);
+
+
+    const times = [0, 3]; // 关键帧时间数组
+    const rotationValues = [0, -Math.PI / 2];
+    const rotationTrack = new THREE.KeyframeTrack(
+        'door.rotation[y]',
+        times,
+        rotationValues
+    ); // 关键帧轨道
+    const duration = 3; // 持续时间 (单位秒)
+    const clip = new THREE.AnimationClip('open', duration, [rotationTrack]); // 动画剪辑
+
+    // 播放编辑好的关键帧数据
+    const mixer = new THREE.AnimationMixer(doorMesh); // 动画混合器
+    const AnimationAction = mixer.clipAction(clip); // 返回所传入的剪辑参数的AnimationAction
+    AnimationAction.timeScale = 1; // 可以调节播放速度，默认是1。为0时动画暂停。值为负数时动画会反向执行。
+    AnimationAction.play(); // 开始播放
+
+
+    // 方旋转式2 引入group 作为轴   更容易理解 缺点 无法鼠标点击
+    // // 实现门围绕特定轴旋转
+    // const group = new THREE.Group();
+    // group.position.set(5, 10, 0); // 设置外层对象的中心为原本想要旋转的位置
+    // group.add(doorMesh);
+    // group.name = 'door';
+    // doorMesh.position.set(-5, 0, 0);
+    // scene.add(group);
+    //
+    // const times = [0, 3]; // 关键帧时间数组
+    // const rotationValues = [0, -Math.PI / 2];
+    // const rotationTrack = new THREE.KeyframeTrack(
+    //         'door.rotation[y]',
+    //         times,
+    //         rotationValues
+    // ); // 关键帧轨道
+    // const duration = 3; // 持续时间 (单位秒)
+    // const clip = new THREE.AnimationClip('open', duration, [rotationTrack]); // 动画剪辑
+    //
+    // // 播放编辑好的关键帧数据
+    // const mixer = new THREE.AnimationMixer(group); // 动画混合器
+    // const AnimationAction = mixer.clipAction(clip); // 返回所传入的剪辑参数的AnimationAction
+    // AnimationAction.timeScale = 1; // 可以调节播放速度，默认是1。为0时动画暂停。值为负数时动画会反向执行。
+    // AnimationAction.play(); // 开始播放
+
+    // 还有其他方式
+
+    render();
+
+    function render() {
+        requestAnimationFrame(render);
+        stats.begin();
+        renderer.render(scene, camera);
+        mixer.update(clock.getDelta());
+        stats.end();
+    }
+
+
+</script>
+</body>
+</html>
